@@ -33,7 +33,7 @@ const caseStudies = {
     title: 'Alwaseet Line', intro: 'An on-demand services platform for government and corporate service workflows.',
     problem: 'Service requests often involve multiple steps and require clear workflow coordination.',
     approach: ['Modular Laravel architecture.', 'Structured service request flows.', 'Workflow automation for service delivery operations.'],
-    focus: 'Maintainable modules and structured workflow automation.', technologies: ['Laravel', 'Workflow automation', 'Modules']
+    focus: 'Maintainable modules and structured workflow automation.', technologies: ['Laravel', 'Workflow automation', 'Modules'], url: 'https://alwaseet-line-bh.com/'
   }
 };
 const dialog = document.querySelector('#case-dialog');
@@ -54,26 +54,45 @@ document.querySelector('.dialog-close').addEventListener('click',()=>dialog.clos
 dialog.addEventListener('close',()=>document.body.classList.remove('modal-open'));
 dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});
 
-// The public GitHub API is queried by visitors' browsers, so this section always reflects
-// the actual public repositories without building/publishing the site again.
-async function loadRepos(){
-  const grid=document.querySelector('#repo-grid'), status=document.querySelector('#repo-status');
-  try{
-    const response=await fetch('https://api.github.com/users/Sehly/repos?per_page=100&sort=updated',{headers:{Accept:'application/vnd.github+json'}});
-    if(!response.ok)throw new Error(`GitHub API returned ${response.status}`);
-    const all=await response.json();
-    const repos=all.filter(r=>!r.fork&&!r.archived).sort((a,b)=>(b.stargazers_count-a.stargazers_count)||new Date(b.pushed_at)-new Date(a.pushed_at)).slice(0,6);
-    grid.replaceChildren();
-    if(!repos.length){grid.append(node('p','Explore all repositories on my GitHub profile.','repo-loading'));return;}
-    repos.forEach(r=>{
-      const card=node('a',null,'repo-card');card.href=r.html_url;card.target='_blank';card.rel='noopener noreferrer';
-      card.append(node('span','⌘','repo-icon'),node('strong',r.name),node('p',r.description||'Public source code repository.'));
-      const footer=node('div',null,'repo-footer');footer.append(node('span',r.language||'Repository'),node('span',`★ ${r.stargazers_count||0}`),node('span','VIEW ↗'));card.append(footer);grid.append(card);
-    });
-    status.textContent='Live data from GitHub public API · Repositories shown by stars and recent activity.';
-  }catch(err){
-    grid.replaceChildren(); const fallback=node('a','View my public repositories on GitHub ↗','btn btn-ghost');fallback.href='https://github.com/Sehly?tab=repositories';fallback.target='_blank';fallback.rel='noopener noreferrer';grid.append(fallback);
-    status.textContent='Live repository feed temporarily unavailable (GitHub API rate limit or network issue).';
-  }
+// Curated repositories: preserve the requested projects and order regardless of stars.
+const featuredRepos = [
+  {slug: 'Saas-Setup', title: 'SaaS Setup', description: 'A public repository focused on SaaS application setup and structure.'},
+  {slug: 'Ecommerce-platform', title: 'Ecommerce Platform', description: 'A public repository for e-commerce application development.'},
+  {slug: 'dynamic_notifier', title: 'Dynamic Notifier', description: 'A public project centered on notification functionality.'},
+  {slug: 'Shipping-Management-System', title: 'Shipping Management System', description: 'A public project exploring shipping management workflows.'}
+];
+
+async function loadRepos() {
+  const grid = document.querySelector('#repo-grid');
+  const status = document.querySelector('#repo-status');
+  const cards = featuredRepos.map(repo => {
+    const card = node('a', null, 'repo-card');
+    card.href = `https://github.com/Sehly/${repo.slug}`;
+    card.target = '_blank';
+    card.rel = 'noopener noreferrer';
+    card.append(node('span', '⌘', 'repo-icon'), node('strong', repo.title), node('p', repo.description));
+    const footer = node('div', null, 'repo-footer');
+    footer.append(node('span', 'GitHub repository'), node('span', 'VIEW SOURCE ↗'));
+    card.append(footer);
+    grid.append(card);
+    return {repo, card};
+  });
+  grid.querySelector('.repo-loading')?.remove();
+  status.textContent = 'Selected public projects · Open a card to view its source code on GitHub.';
+
+  // Optional enhancement: load repository descriptions and languages from the public API.
+  // Cards and direct links remain usable even when API requests are blocked or rate-limited.
+  await Promise.all(cards.map(async ({repo, card}) => {
+    try {
+      const response = await fetch(`https://api.github.com/repos/Sehly/${repo.slug}`, {
+        headers: {Accept: 'application/vnd.github+json'}
+      });
+      if (!response.ok) return;
+      const data = await response.json();
+      if (data.description) card.querySelector('p').textContent = data.description;
+      const label = card.querySelector('.repo-footer span');
+      if (data.language) label.textContent = data.language;
+    } catch (_) { /* Keep the static, clickable fallback. */ }
+  }));
 }
 loadRepos();
